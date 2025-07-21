@@ -1,0 +1,6 @@
+numpy
+matplotlib
+scipy
+librosa
+scikit-learn
+tensorflow  # or torch depending on model
