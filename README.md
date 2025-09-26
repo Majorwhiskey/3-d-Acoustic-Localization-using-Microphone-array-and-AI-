@@ -110,3 +110,69 @@ sudo dd if=/dev/sdX | sha256sum
   * Compare the output of both commands. They should be identical.
 
 Once verified, you're ready to proceed to the next step.
+
+
+ 
+ 
+ 
+ 
+ ## Setup for Simultaneous_REcording_on_booting
+
+## Step 1: Create the Recording Script
+
+First, save your Python recording script (or the three Linux commands) into a single executable shell script. Let's call it start_recording.sh and place it in your home directory.
+
+Example content for start_recording.sh:
+```Bash
+
+#!/bin/bash
+# Navigate to the correct directory and run the Python script
+/usr/bin/python3 /home/pi/recording_script.py
+```
+After creating the file, make it executable:
+```Bash
+
+chmod +x /home/pi/start_recording.sh
+```
+## Step 2: Create the Systemd Service File
+
+This file tells the system what to do when it boots. Create a new service file named recording.service in the /etc/systemd/system/ directory.
+Bash
+```
+sudo nano /etc/systemd/system/recording.service
+```
+Paste the following content into the file:
+Ini, TOML
+```
+[Unit]
+Description=Start multi-channel audio recording on boot
+After=network.target
+
+[Service]
+ExecStart=/home/pi/start_recording.sh
+User=pi
+Type=simple
+Restart=on-failure
+WorkingDirectory=/home/pi/
+
+[Install]
+WantedBy=multi-user.target
+``` 
+   Description: A brief description of the service.
+
+   ExecStart: The full path to the script that will be executed.
+
+   User: Specifies the user account (pi) to run the script as.
+
+   WantedBy=multi-user.target: This is the key line that ensures the service starts automatically when the system boots up.
+
+## Step 3: Enable and Start the Service
+
+Now, tell systemd to reload its configuration and enable your new service.
+```Bash
+
+sudo systemctl daemon-reload
+sudo systemctl enable recording.service
+```
+
+After running these commands, your Raspberry Pi will start the recording script every time it boots. You will need to perform this entire process on each of your **'n'** units
