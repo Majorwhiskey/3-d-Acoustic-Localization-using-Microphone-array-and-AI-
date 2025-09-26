@@ -39,70 +39,74 @@ Before flashing the operating system, the SD card must be formatted to ensure it
 
 ```bash
 sudo mkfs.vfat /dev/sda
-
-Step 2: Flash the Raspberry Pi OS with Linux Commands
+```
+## Step 2: Flash the Raspberry Pi OS with Linux Commands
 
 After formatting your SD card, you can flash the Raspberry Pi OS image directly from the command line on Linux. This method is an alternative to the graphical Raspberry Pi Imager.
 
-1. Download the OS Image
+-----
 
-First, you'll need to download the .img or .zip file of the Raspberry Pi OS. The latest versions are available on the official Raspberry Pi website. You can use wget to download it directly from the terminal.
-Bash
+### 1\. Download the OS Image
 
+First, you'll need to download the `.img` or `.zip` file of the Raspberry Pi OS. The latest versions are available on the official Raspberry Pi website. You can use `wget` to download it directly from the terminal.
+
+```bash
 wget https://downloads.raspberrypi.com/raspios_lite_armhf/images/raspios_lite_armhf-2023-05-03/2023-05-03-raspios-bullseye-armhf-lite.img.xz
+```
 
-Note: This is an example URL. Always use the latest URL from the official site.
+*Note: This is an example URL. Always use the latest URL from the official site.*
 
-2. Decompress the Image
+### 2\. Decompress the Image
 
-If the downloaded file is a .zip or .xz compressed archive, you need to decompress it. For .xz files, use the unxz command.
-Bash
+If the downloaded file is a `.zip` or `.xz` compressed archive, you need to decompress it. For `.xz` files, use the `unxz` command.
 
+```bash
 unxz 2023-05-03-raspios-bullseye-armhf-lite.img.xz
+```
 
-This will create the .img file, which is the raw disk image you'll flash.
+This will create the `.img` file, which is the raw disk image you'll flash.
 
-3. Identify the SD Card Device
+### 3\. Identify the SD Card Device
 
-You already know the device name from the previous step. Confirm it's the correct device with lsblk. This step is critical to avoid overwriting the wrong drive.
-Bash
+You already know the device name from the previous step. Confirm it's the correct device with `lsblk`. **This step is critical to avoid overwriting the wrong drive.**
 
+```bash
 lsblk
+```
 
-Look for your SD card, which might be /dev/sda or /dev/sdb.
+Look for your SD card, which might be `/dev/sda` or `/dev/sdb`.
 
-4. Flash the Image with dd
+### 4\. Flash the Image with `dd`
 
-The dd (disk duplicator) command is a powerful tool for low-level data copying. It's used here to write the disk image to the SD card.
-Bash
+The `dd` (disk duplicator) command is a powerful tool for low-level data copying. It's used here to write the disk image to the SD card.
 
+```bash
 sudo dd bs=4M if=/path/to/your/image.img of=/dev/sdX conv=fsync status=progress
+```
 
-    sudo: Executes the command with root privileges, which are required for writing to a disk device.
+  * `sudo`: Executes the command with root privileges, which are required for writing to a disk device.
+  * `dd`: The command itself.
+  * `bs=4M`: Sets the block size to 4 megabytes. This makes the transfer faster than the default 512 bytes.
+  * `if=/path/to/your/image.img`: The **i**nput **f**ile, which is the OS image you downloaded. Replace the path with the actual location of your image file.
+  * `of=/dev/sdX`: The **o**utput **f**ile. **Be extremely careful here.** Replace `/dev/sdX` with the device name of your SD card (e.g., `/dev/sda`). Do not include a partition number (like `sda1`), as you're writing to the entire disk.
+  * `conv=fsync`: Ensures all cached writes are physically written to the device, preventing corruption.
+  * `status=progress`: Displays a real-time progress report.
 
-    dd: The command itself.
+-----
 
-    bs=4M: Sets the block size to 4 megabytes. This makes the transfer faster than the default 512 bytes.
+### 5\. Verify the Write (Optional but Recommended)
 
-    if=/path/to/your/image.img: The input file, which is the OS image you downloaded. Replace the path with the actual location of your image file.
+Once `dd` finishes, all data has been written to the card. It's a good idea to verify the write by comparing the checksum of the image file to the checksum of the written device.
 
-    of=/dev/sdX: The output file. Be extremely careful here. Replace /dev/sdX with the device name of your SD card (e.g., /dev/sda). Do not include a partition number (like sda1), as you're writing to the entire disk.
-
-    conv=fsync: Ensures all cached writes are physically written to the device, preventing corruption.
-
-    status=progress: Displays a real-time progress report.
-
-5. Verify the Write (Optional but Recommended)
-
-Once dd finishes, all data has been written to the card. It's a good idea to verify the write by comparing the checksum of the image file to the checksum of the written device.
-Bash
-
+```bash
 sha256sum /path/to/your/image.img
+```
 
-Bash
-
+```bash
 sudo dd if=/dev/sdX | sha256sum
+```
 
-    The dd command reads the entire SD card and pipes the output to sha256sum to generate a checksum.
+  * The `dd` command reads the entire SD card and pipes the output to `sha256sum` to generate a checksum.
+  * Compare the output of both commands. They should be identical.
 
-    Compare the output of both commands. They should be identical.
+Once verified, you're ready to proceed to the next step.
