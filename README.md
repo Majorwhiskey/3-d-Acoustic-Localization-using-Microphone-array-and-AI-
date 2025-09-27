@@ -1,28 +1,3 @@
-# Localized Sound Final
-
-This repository contains a Jupyter Notebook for sound localization using signal processing and/or machine learning techniques.
-
-## Files
-
-- `Localized_Sound_final.ipynb`: The main notebook containing the implementation.
-- `README.md`: This file.
-
-## How to Run
-
-1. Open the notebook in Jupyter or Google Colab.
-2. Install necessary dependencies if prompted.
-3. Follow the cells sequentially to replicate the results.
-
-## Requirements
-
-- Python 3.8+
-- Jupyter Notebook
-- Libraries: `numpy`, `matplotlib`, `librosa`, `scipy`, etc.
-
-## Author
-
-Amogh Ukkadagatri
-
 # Raspberry Pi OS Setup Guide in Ubuntu
 
 ---
@@ -116,40 +91,56 @@ Once verified, you're ready to proceed to the next step.
  
  
  
- ## Setup for Simultaneous_REcording_on_booting
+ # Setup for Simultaneous_REcording_on_booting
 
-## Step 1: Create the Recording Script
+## Step 1: Create the Simplified Python Script
 
-First, save your Python recording script (or the three Linux commands) into a single executable shell script. Let's call it start_recording.sh and place it in your home directory.
-
-Example content for start_recording.sh:
+First, create a new Python file named startup_message.py. This script will only send the UDP message and then exit.
 ```Bash
+sudo nano /home/pi/startup_message.py
+```
+Paste the following content into the file. Replace <center-ip> with the actual IP address of your command center.
+```Python
+import socket
+import subprocess
 
-#!/bin/bash
-# Navigate to the correct directory and run the Python script
-/usr/bin/python3 /home/pi/recording_script.py
+# --- Configuration ---
+CENTER_IP = "<center-ip>"  # Replace with the IP of your command center
+UDP_PORT = 5018
+MESSAGE = "Pi is awake"
+
+def send_udp_message(ip, port, message):
+    """Sends a simple UDP message."""
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.sendto(message.encode('utf-8'), (ip, port))
+        print(f"Sent UDP message to {ip}:{port}")
+    except Exception as e:
+        print(f"Error sending UDP message: {e}")
+
+if __name__ == "__main__":
+    send_udp_message(CENTER_IP, UDP_PORT, MESSAGE)
+    # The script will exit after sending the message
 ```
 After creating the file, make it executable:
 ```Bash
-
-chmod +x /home/pi/start_recording.sh
+sudo chmod +x /home/pi/startup_message.py
 ```
-## Step 2: Create the Systemd Service File
+## Step 2: Update the Systemd Service File
 
-This file tells the system what to do when it boots. Create a new service file named recording.service in the /etc/systemd/system/ directory.
-Bash
-```
+Now, you need to modify your service file to run the new script.
+```Bash
 sudo nano /etc/systemd/system/recording.service
 ```
-Paste the following content into the file:
-Ini, TOML
-```
+Change the ExecStart line to point to the new Python script:
+```Ini, TOML
+
 [Unit]
-Description=Start multi-channel audio recording on boot
-After=network.target
+Description=Send UDP message on boot
+After=network-online.target
 
 [Service]
-ExecStart=/home/pi/start_recording.sh
+ExecStart=/usr/bin/python3 /home/pi/startup_message.py
 User=pi
 Type=simple
 Restart=on-failure
@@ -157,22 +148,10 @@ WorkingDirectory=/home/pi/
 
 [Install]
 WantedBy=multi-user.target
-``` 
-   Description: A brief description of the service.
-
-   ExecStart: The full path to the script that will be executed.
-
-   User: Specifies the user account (pi) to run the script as.
-
-   WantedBy=multi-user.target: This is the key line that ensures the service starts automatically when the system boots up.
-
-## Step 3: Enable and Start the Service
-
-Now, tell systemd to reload its configuration and enable your new service.
+```
+Finally, tell systemd to use this new service.
 ```Bash
-
 sudo systemctl daemon-reload
 sudo systemctl enable recording.service
 ```
-
-After running these commands, your Raspberry Pi will start the recording script every time it boots. You will need to perform this entire process on each of your **'n'** units
+After rebooting each of your Raspberry Pis, the startup_message.py script will run automatically, and it will only send the UDP message.
