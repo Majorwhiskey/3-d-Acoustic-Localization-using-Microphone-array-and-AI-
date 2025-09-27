@@ -50,11 +50,65 @@ The first time, you will clone the repository. This creates a local copy on the 
 cd /home/pi/
 git clone <your-remote-repository-url>
 ```
-## 2. Pull the Latest Changes
+### (Note:- Ignore if the repo is already cloned)
 
-When you make updates on your desktop and push them to the remote repository, you can update each Raspberry Pi with a single command.
-```Bash
-cd <your-project-directory>
-git pull
+## 2.Create a List of Your Raspberry Pis
+
+On your central computer (your desktop), create a simple text file that contains the IP address of each Raspberry Pi on a new line. Let's call this file raspi_list.txt.
+
+Example raspi_list.txt content:
+```txt
+192.168.1.101
+192.168.1.102
+192.168.1.103
+192.168.1.104
+# Add all your Raspberry Pi IP addresses here
 ```
-This git pull command will download and apply the latest changes, keeping all your Raspberry Pis perfectly synchronized.
+##  3.Create a Deployment Script
+
+Create a single shell script that will read from this list and automatically log in to each Raspberry Pi to run the git pull command. Let's call this script deploy_pis.sh.
+```Bash
+sudo nano deploy_pis.sh
+```
+Paste the following content into the file:
+```Bash
+#!/bin/bash
+
+# Define the location of the IP list
+IP_LIST="raspi_list.txt"
+
+# Check if the list file exists
+if [ ! -f "$IP_LIST" ]; then
+    echo "Error: IP list file not found!"
+    exit 1
+fi
+
+# Loop through each IP address in the file
+while read -r IP; do
+    # Skip empty lines and comments
+    if [[ -z "$IP" || "$IP" =~ ^# ]]; then
+        continue
+    fi
+    
+    echo "--- Deploying to Raspberry Pi at $IP ---"
+    
+    # Use SSH to connect and run the git pull command
+    ssh pi@"$IP" 'cd /home/pi/<your-project-folder> && git pull'
+    
+    # You can add more commands here if needed, for example:
+    # ssh pi@"$IP" 'g++ /home/pi/your_cpp_file.cpp -o /home/pi/your_program'
+
+    echo "--- Deployment to $IP complete ---"
+done < "$IP_LIST"
+```
+Make the script executable:
+```Bash
+chmod +x deploy_pis.sh
+```
+## 3.Run the Script
+
+Now, whenever you want to deploy your latest code to all n of your Raspberry Pis, you just need to run this single script from your desktop.
+```Bash
+./deploy_pis.sh
+```
+This will automatically log in to each Raspberry Pi in the list and pull the latest changes from your Git repository.
