@@ -93,7 +93,7 @@ while read -r IP; do
     echo "--- Deploying to Raspberry Pi at $IP ---"
     
     # Use SSH to connect and run the git pull command
-    ssh pi@"$IP" 'cd /home/pi/<your-project-folder> && git pull'
+    ssh pi@"$IP" 'cd /home/pi/<your-project-folder> && git checkout main && git pull'
     
     # You can add more commands here if needed, for example:
     # ssh pi@"$IP" 'g++ /home/pi/your_cpp_file.cpp -o /home/pi/your_program'
