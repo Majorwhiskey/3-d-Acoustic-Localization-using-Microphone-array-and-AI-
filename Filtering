@@ -149,3 +149,311 @@ if __name__ == "__main__":
     #plt.colorbar(axs[0, 2].collections[0], ax=axs[:, 2], format="%+2.0f dB")
     #plt.tight_layout()
     #plt.show()
+
+
+## for median
+
+import numpy as np
+import librosa
+import librosa.display
+import matplotlib.pyplot as plt
+from typing import Tuple
+import soundfile as sf  # safer for multi-channel WAV
+
+# -------------------------------
+# Core function (noise suppression with coherence)
+# -------------------------------
+def process_multi_channel_coherence(
+        tf_maps: np.ndarray,
+        calc_coherence: callable,
+        coherence_threshold: float = 0.5,
+        logging: bool = False
+    ) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    tf_maps: (K, L, M) complex STFT maps, K=channels, L=freq bins, M=time frames
+    calc_coherence: function(x,y) -> coherence matrix (L,M)
+    """
+    K, L, M = tf_maps.shape
+    if K < 2:
+        raise ValueError("At least 2 channels are required for coherence analysis")
+
+    num_pairs = K * (K - 1) // 2
+    if logging:
+        print(f"[COHERENCE] Processing {K} channels, {num_pairs} channel pairs")
+        print(f"[COHERENCE] TF map shape: {L}×{M}")
+
+    coherence_streams = np.zeros((num_pairs, L, M))
+    max_coherence = np.zeros((L, M))
+    best_pair_indices = np.zeros((L, M), dtype=int)
+
+    pair_idx = 0
+    for i in range(K):
+        for j in range(i + 1, K):
+            if logging:
+                print(f"[COHERENCE] Pair ({i}, {j})")
+
+            coherence = calc_coherence(tf_maps[i], tf_maps[j])  # (L, M)
+            coherence_streams[pair_idx] = coherence
+
+            better_mask = coherence > max_coherence
+            max_coherence[better_mask] = coherence[better_mask]
+            best_pair_indices[better_mask] = pair_idx
+            pair_idx += 1
+
+    # Threshold mask
+    coherence_mask = max_coherence >= coherence_threshold
+
+    # Average TF from the best coherent pair at each bin
+    average_tf_map = np.zeros((L, M), dtype=np.complex64)
+    for l in range(L):
+        for m in range(M):
+            if coherence_mask[l, m]:
+                best_pair = best_pair_indices[l, m]
+                i, j = _pair_index_to_channels(best_pair, K)
+                average_tf_map[l, m] = (tf_maps[i, l, m] + tf_maps[j, l, m]) / 2.0
+            else:
+                average_tf_map[l, m] = 0.0  # noise suppressed
+
+    if logging:
+        coherence_stats = {
+            'mean': np.mean(max_coherence),
+            'std': np.std(max_coherence),
+            'min': np.min(max_coherence),
+            'max': np.max(max_coherence),
+            'above_threshold': np.sum(coherence_mask) / (L * M) * 100
+        }
+        print("[COHERENCE] Stats:")
+        for k, v in coherence_stats.items():
+            print(f"  {k}: {v:.3f}" if isinstance(v, float) else f"  {k}: {v}")
+
+    return average_tf_map, coherence_mask
+
+
+def _pair_index_to_channels(pair_idx: int, K: int) -> Tuple[int, int]:
+    """Convert linear pair index back to channel indices (i,j)."""
+    i = 0
+    remaining = pair_idx
+    while remaining >= (K - 1 - i):
+        remaining -= (K - 1 - i)
+        i += 1
+    j = i + 1 + remaining
+    return i, j
+
+# -------------------------------
+# Example coherence calculator
+# -------------------------------
+def simple_coherence(x: np.ndarray, y: np.ndarray) -> np.ndarray:
+    """Pixel-wise coherence: |X*Y| / (|X||Y|)"""
+    eps = 1e-8
+    return np.abs(x * np.conj(y)) / (np.abs(x) * np.abs(y) + eps)
+
+# -------------------------------
+# Demo pipeline with plotting
+# -------------------------------
+if __name__ == "__main__":
+    # ------------------------------
+    # LOAD YOUR OWN MULTI-CHANNEL AUDIO
+    # ------------------------------
+    audio_file_path = "/content/DroneSound_noMuff.wav"  # <-- Update this
+    y, sr = sf.read(audio_file_path)  # preserves all channels
+
+    # Ensure y is shape (channels, samples)
+    if y.ndim == 1:  # mono
+        y = y[np.newaxis, :]
+    else:
+        y = y.T  # shape: (channels, samples)
+
+    num_channels = y.shape[0]
+    print(f"Loaded {num_channels} channels, {y.shape[1]} samples at {sr} Hz")
+
+    # STFT for each channel
+    n_fft = 1024
+    hop_length = 512
+    tf_maps = np.array([librosa.stft(y[ch], n_fft=n_fft, hop_length=hop_length) for ch in range(num_channels)])
+
+    # Process coherence
+    avg_tf_map, coherence_mask = process_multi_channel_coherence(
+        tf_maps, simple_coherence, coherence_threshold=0.6, logging=True
+    )
+
+    # -------------------------------
+    # PLOTS
+    # -------------------------------
+    fig, axs = plt.subplots(num_channels, 3, figsize=(15, 3*num_channels))
+
+    avg_tf_noisy = np.mean(np.abs(tf_maps), axis=0)
+    masked_tf = np.abs(avg_tf_map)
+
+    for ch in range(num_channels):
+        # Raw TF per channel
+        librosa.display.specshow(20*np.log10(np.abs(tf_maps[ch])+1e-8),
+                                 sr=sr, hop_length=hop_length, x_axis='time', y_axis='log', ax=axs[ch, 0])
+        axs[ch, 0].set_title(f"Channel {ch} TF Map")
+
+        # Average TF
+        librosa.display.specshow(20*np.log10(avg_tf_noisy+1e-8),
+                                 sr=sr, hop_length=hop_length, x_axis='time', y_axis='log', ax=axs[ch, 1])
+        axs[ch, 1].set_title("Average TF (Noisy)")
+
+        # Noise-suppressed TF
+        librosa.display.specshow(20*np.log10(masked_tf+1e-8),
+                                 sr=sr, hop_length=hop_length, x_axis='time', y_axis='log', ax=axs[ch, 2])
+        axs[ch, 2].set_title("Noise-Suppressed TF")
+
+    # Colorbar for masked TF
+    #plt.colorbar(axs[0, 2].collections[0], ax=axs[:, 2], format="%+2.0f dB")
+    #plt.tight_layout()
+    #plt.show()
+##for suaring
+
+import numpy as np
+import librosa
+import librosa.display
+import matplotlib.pyplot as plt
+from typing import Tuple
+import soundfile as sf  # safer for multi-channel WAV
+
+# -------------------------------
+# Core function (squared coherence filter)
+# -------------------------------
+def process_multi_channel_coherence_squared(
+        tf_maps: np.ndarray,
+        calc_coherence: callable,
+        coherence_threshold: float = 0.5,
+        logging: bool = False
+    ) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    tf_maps: (K, L, M) complex STFT maps, K=channels, L=freq bins, M=time frames
+    calc_coherence: function(x,y) -> coherence matrix (L,M)
+    Applies squared coherence mask to preserve only strong coherent components.
+    """
+    K, L, M = tf_maps.shape
+    if K < 2:
+        raise ValueError("At least 2 channels are required for coherence analysis")
+
+    num_pairs = K * (K - 1) // 2
+    if logging:
+        print(f"[COHERENCE] Processing {K} channels, {num_pairs} channel pairs")
+        print(f"[COHERENCE] TF map shape: {L}×{M}")
+
+    coherence_streams = np.zeros((num_pairs, L, M))
+    max_coherence = np.zeros((L, M))
+    best_pair_indices = np.zeros((L, M), dtype=int)
+
+    pair_idx = 0
+    for i in range(K):
+        for j in range(i + 1, K):
+            if logging:
+                print(f"[COHERENCE] Pair ({i}, {j})")
+
+            coherence = calc_coherence(tf_maps[i], tf_maps[j])  # (L, M)
+            coherence_streams[pair_idx] = coherence
+
+            better_mask = coherence > max_coherence
+            max_coherence[better_mask] = coherence[better_mask]
+            best_pair_indices[better_mask] = pair_idx
+            pair_idx += 1
+
+    # -------------------------
+    # Squared coherence mask
+    # -------------------------
+    coherence_mask = (max_coherence**2) >= coherence_threshold
+
+    # Average TF from the best coherent pair at each bin
+    average_tf_map = np.zeros((L, M), dtype=np.complex64)
+    for l in range(L):
+        for m in range(M):
+            if coherence_mask[l, m]:
+                best_pair = best_pair_indices[l, m]
+                i, j = _pair_index_to_channels(best_pair, K)
+                average_tf_map[l, m] = (tf_maps[i, l, m] + tf_maps[j, l, m]) / 2.0
+            else:
+                average_tf_map[l, m] = 0.0  # suppressed
+
+    if logging:
+        coherence_stats = {
+            'mean': np.mean(max_coherence),
+            'std': np.std(max_coherence),
+            'min': np.min(max_coherence),
+            'max': np.max(max_coherence),
+            'above_threshold': np.sum(coherence_mask) / (L * M) * 100
+        }
+        print("[COHERENCE] Stats (Squared Filter):")
+        for k, v in coherence_stats.items():
+            print(f"  {k}: {v:.3f}" if isinstance(v, float) else f"  {k}: {v}")
+
+    return average_tf_map, coherence_mask
+
+
+def _pair_index_to_channels(pair_idx: int, K: int) -> Tuple[int, int]:
+    """Convert linear pair index back to channel indices (i,j)."""
+    i = 0
+    remaining = pair_idx
+    while remaining >= (K - 1 - i):
+        remaining -= (K - 1 - i)
+        i += 1
+    j = i + 1 + remaining
+    return i, j
+
+
+# -------------------------------
+# Example coherence calculator
+# -------------------------------
+def simple_coherence(x: np.ndarray, y: np.ndarray) -> np.ndarray:
+    """Pixel-wise coherence: |X*Y| / (|X||Y|)"""
+    eps = 1e-8
+    return np.abs(x * np.conj(y)) / (np.abs(x) * np.abs(y) + eps)
+
+
+# -------------------------------
+# Demo pipeline
+# -------------------------------
+if __name__ == "__main__":
+    audio_file_path = "/content/DroneSound_noMuff.wav"  # <-- Update this
+    y, sr = sf.read(audio_file_path)  # preserves all channels
+
+    # Ensure shape (channels, samples)
+    if y.ndim == 1:
+        y = y[np.newaxis, :]
+    else:
+        y = y.T
+
+    num_channels = y.shape[0]
+    print(f"Loaded {num_channels} channels, {y.shape[1]} samples at {sr} Hz")
+
+    # STFT per channel
+    n_fft = 1024
+    hop_length = 512
+    tf_maps = np.array([librosa.stft(y[ch], n_fft=n_fft, hop_length=hop_length) for ch in range(num_channels)])
+
+    # Apply squared coherence filter
+    avg_tf_map, coherence_mask = process_multi_channel_coherence_squared(
+        tf_maps, simple_coherence, coherence_threshold=0.36, logging=True
+    )
+    # Note: threshold reduced because of squaring
+
+    # -------------------------------
+    # PLOTS
+    # -------------------------------
+    fig, axs = plt.subplots(num_channels, 3, figsize=(15, 3*num_channels))
+    avg_tf_noisy = np.mean(np.abs(tf_maps), axis=0)
+    masked_tf = np.abs(avg_tf_map)
+
+    for ch in range(num_channels):
+        librosa.display.specshow(20*np.log10(np.abs(tf_maps[ch])+1e-8),
+                                 sr=sr, hop_length=hop_length, x_axis='time', y_axis='log', ax=axs[ch, 0])
+        axs[ch, 0].set_title(f"Channel {ch} TF Map")
+
+        librosa.display.specshow(20*np.log10(avg_tf_noisy+1e-8),
+                                 sr=sr, hop_length=hop_length, x_axis='time', y_axis='log', ax=axs[ch, 1])
+        axs[ch, 1].set_title("Average TF (Noisy)")
+
+        librosa.display.specshow(20*np.log10(masked_tf+1e-8),
+                                 sr=sr, hop_length=hop_length, x_axis='time', y_axis='log', ax=axs[ch, 2])
+        axs[ch, 2].set_title("Noise-Suppressed TF (Squared Filter)")
+
+    # Colorbar for masked TF
+    #plt.colorbar(axs[0, 2].collections[0], ax=axs[:, 2], format="%+2.0f dB")
+    #plt.tight_layout()
+    #plt.show()
+
