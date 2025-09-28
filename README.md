@@ -86,9 +86,43 @@ sudo dd if=/dev/sdX | sha256sum
 
 Once verified, you're ready to proceed to the next step.
 
+# Software Installation 💻
 
+The software setup requires you to install drivers and verify the hardware is working correctly. You'll need to use the terminal on your Raspberry Pi.
+
+## 1. Update your Raspberry Pi OS
+
+First, ensure your Raspberry Pi's operating system is up to date. Open a terminal and run the following commands:
+```Bash
+sudo apt update
+sudo apt upgrade
+sudo reboot
+```
+The reboot command will restart your Pi to apply all the changes.
+
+## 2. Install the ReSpeaker Driver
+
+Seeed Studio, the maker of ReSpeaker, provides an installation script for its voice cards.
+
+Clone the driver repository from GitHub:
+```Bash
+git clone https://github.com/respeaker/seeed-voicecard.git
+cd seeed-voicecard
+```
+Run the installation script. The script will automatically detect your Pi's architecture.
+```Bash
+sudo ./install.sh
+```
+If you're using a 64-bit version of Raspberry Pi OS, some sources suggest using sudo ./install_arm64.sh instead, but the main install script should work on most systems.
+
+## 3. Reboot your Pi once the installation is complete.
+```Bash
+    sudo reboot
+ ```
  
- 
+
+
+
  
  
  # Setup for Simultaneous_REcording_on_booting
