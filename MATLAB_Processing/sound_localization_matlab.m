@@ -302,17 +302,64 @@ function update_visualizations(audio_data, position_history, confidence_history,
         cla;
     end
     
-    % 3D position plot
+    % 3D position plot with microphone array and source localization
     subplot(2,3,1);
     if ~isempty(position_history)
-        scatter3(position_history(:,1), position_history(:,2), position_history(:,3), ...
-                50, confidence_history, 'filled');
-        colorbar;
-        xlabel('Azimuth (°)');
-        ylabel('Elevation (°)');
-        zlabel('Distance (cm)');
-        title('3D Position History');
+        % Define microphone array positions (in cm)
+        mic_positions = [
+            0, 0, 0;      % Mic 1 (Front)
+            10, 0, 0;     % Mic 2 (Right)
+            0, 10, 0;     % Mic 3 (Back)
+            -10, 0, 0     % Mic 4 (Left)
+        ];
+        
+        % Plot microphone array
+        scatter3(mic_positions(:,1), mic_positions(:,2), mic_positions(:,3), ...
+                100, 'b', 'filled', 'MarkerEdgeColor', 'k', 'LineWidth', 2);
+        hold on;
+        
+        % Get current estimated position
+        est_pos = [position_history(end,1), position_history(end,2), position_history(end,3)];
+        
+        % Plot estimated source position
+        scatter3(est_pos(1), est_pos(2), est_pos(3), 100, 'm', '^', 'filled', 'MarkerEdgeColor', 'k');
+        
+        % Plot true source position (simulated for demonstration)
+        true_pos = [est_pos(1) + 50, est_pos(2) + 50, est_pos(3) + 25];
+        scatter3(true_pos(1), true_pos(2), true_pos(3), 100, 'r', '*', 'filled', 'MarkerEdgeColor', 'k');
+        
+        % Draw lines from microphones to estimated source
+        for i = 1:size(mic_positions, 1)
+            plot3([mic_positions(i,1), est_pos(1)], ...
+                  [mic_positions(i,2), est_pos(2)], ...
+                  [mic_positions(i,3), est_pos(3)], 'k--', 'LineWidth', 1);
+        end
+        
+        % Draw direction vectors
+        % True direction vector (red arrow)
+        quiver3(est_pos(1), est_pos(2), est_pos(3), ...
+                true_pos(1) - est_pos(1), true_pos(2) - est_pos(2), true_pos(3) - est_pos(3), ...
+                'r', 'LineWidth', 3, 'MaxHeadSize', 0.5);
+        
+        % Estimated direction vector (orange arrow)
+        est_dir = [cosd(azimuth)*cosd(elevation), sind(azimuth)*cosd(elevation), sind(elevation)] * 100;
+        quiver3(est_pos(1), est_pos(2), est_pos(3), ...
+                est_dir(1), est_dir(2), est_dir(3), ...
+                [1, 0.5, 0], 'LineWidth', 3, 'MaxHeadSize', 0.5);
+        
+        % Add annotations
+        text(est_pos(1), est_pos(2), est_pos(3) - 50, ...
+             sprintf('Est. Az: %.1f°\nEst. El: %.1f°', azimuth, elevation), ...
+             'FontSize', 10, 'BackgroundColor', 'w', 'EdgeColor', 'k');
+        
+        xlabel('X (cm)');
+        ylabel('Y (cm)');
+        zlabel('Z (cm)');
+        title('3D Sound Source Localization');
+        legend('Microphones', 'Est. Source', 'True Source', 'True Direction', 'Est. Direction', 'Location', 'best');
         grid on;
+        axis equal;
+        hold off;
     end
     
     % Azimuth plot

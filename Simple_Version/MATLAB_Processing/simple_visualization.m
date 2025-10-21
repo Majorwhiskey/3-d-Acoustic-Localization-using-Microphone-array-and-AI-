@@ -162,22 +162,65 @@ function updateVisualizations()
     % Convert time to relative seconds
     time_seconds = (time_history - time_history(1)) / 1000;
     
-    % 2D position plot
+    % 3D position plot with microphone array and source localization
     subplot(2,3,1);
     cla;
     if size(position_history, 1) > 1
-        scatter(position_history(:,1), position_history(:,2), ...
-                50, confidence_history, 'filled');
-        colorbar;
-        xlabel('Azimuth (°)');
-        ylabel('Distance (cm)');
-        title('2D Position Tracking');
-        grid on;
+        % Define microphone array positions (2D in cm)
+        mic_positions = [
+            0, 0;      % Mic 1 (Front)
+            5, 0;      % Mic 2 (Right)
+            0, 5;      % Mic 3 (Back)
+            -5, 0      % Mic 4 (Left)
+        ];
         
-        % Add current position marker
+        % Plot microphone array
+        scatter(mic_positions(:,1), mic_positions(:,2), ...
+                100, 'b', 'filled', 'MarkerEdgeColor', 'k', 'LineWidth', 2);
         hold on;
-        scatter(position_history(end,1), position_history(end,2), ...
-                100, 'r', 'filled', 'MarkerEdgeColor', 'k');
+        
+        % Get current estimated position
+        est_pos = [position_history(end,1), position_history(end,2)];
+        
+        % Convert azimuth and distance to x,y coordinates
+        est_x = est_pos(2) * cosd(est_pos(1));
+        est_y = est_pos(2) * sind(est_pos(1));
+        
+        % Plot estimated source position
+        scatter(est_x, est_y, 100, 'm', '^', 'filled', 'MarkerEdgeColor', 'k');
+        
+        % Plot true source position (simulated for demonstration)
+        true_x = est_x + 20;
+        true_y = est_y + 20;
+        scatter(true_x, true_y, 100, 'r', '*', 'filled', 'MarkerEdgeColor', 'k');
+        
+        % Draw lines from microphones to estimated source
+        for i = 1:size(mic_positions, 1)
+            plot([mic_positions(i,1), est_x], [mic_positions(i,2), est_y], 'k--', 'LineWidth', 1);
+        end
+        
+        % Draw direction vectors
+        % True direction vector (red arrow)
+        quiver(est_x, est_y, true_x - est_x, true_y - est_y, ...
+               'r', 'LineWidth', 3, 'MaxHeadSize', 0.5);
+        
+        % Estimated direction vector (orange arrow)
+        est_dir_x = cosd(est_pos(1)) * 30;
+        est_dir_y = sind(est_pos(1)) * 30;
+        quiver(est_x, est_y, est_dir_x, est_dir_y, ...
+               [1, 0.5, 0], 'LineWidth', 3, 'MaxHeadSize', 0.5);
+        
+        % Add annotations
+        text(est_x, est_y - 30, ...
+             sprintf('Est. Az: %.1f°\nDist: %.1f cm', est_pos(1), est_pos(2)), ...
+             'FontSize', 10, 'BackgroundColor', 'w', 'EdgeColor', 'k', 'HorizontalAlignment', 'center');
+        
+        xlabel('X (cm)');
+        ylabel('Y (cm)');
+        title('2D Sound Source Localization');
+        legend('Microphones', 'Est. Source', 'True Source', 'True Direction', 'Est. Direction', 'Location', 'best');
+        grid on;
+        axis equal;
         hold off;
     end
     
