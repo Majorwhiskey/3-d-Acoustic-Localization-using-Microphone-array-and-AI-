@@ -15,7 +15,7 @@ Before you can SSH in, you need to find the address the Raspi was assigned by DH
 
 Run the nmap command on your host machine to scan the network subnet for active devices:
 ```bash
-nmap -sP 10.42.0.1/24
+nmap -sP xx.yy.0.1/24
 ```
 Note: Replace 10.42.0.1/24 with your network's specific subnet if it's different (e.g., 192.168.1.1/24). Look for the device named raspberrypi or a similar host name in the output.
 
@@ -23,7 +23,7 @@ Note: Replace 10.42.0.1/24 with your network's specific subnet if it's different
 
 Once the IP is identified (e.g., 10.42.0.xxx), use the ssh command to connect. The default username is pi.
 ```bash
-ssh pi@10.42.0.xxx
+ssh pi@xx.yy.0.xxx
 ```
 ## Step 3: Configure Hostname (Optional but Recommended)
 
@@ -53,8 +53,8 @@ sudo nano /etc/dhcpcd.conf
 Add the following block to the end of the file. This example sets the IP to 172.16.0.88, which is excellent for a private, dedicated network segment.
 ```IN THE FILE
 interface eth0
-    static ip_address=172.16.0.88/24
-    static routers=172.16.0.1
+    static ip_address=xxx.yy.0.88/24
+    static routers=xxx.yy.0.1
     static domain_name_servers=8.8.8.8 8.8.4.4
 ```
 
