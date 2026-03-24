@@ -58,10 +58,10 @@ On your central computer (your desktop), create a simple text file that contains
 
 Example raspi_list.txt content:
 ```txt
-192.168.1.101
-192.168.1.102
-192.168.1.103
-192.168.1.104
+192.xxx.x.101
+192.xxx.x.102
+192.xxx.x.103
+192.xxx.x.104
 # Add all your Raspberry Pi IP addresses here
 ```
 ##  3.Create a Deployment Script
